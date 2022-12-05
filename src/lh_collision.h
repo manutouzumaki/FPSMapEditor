@@ -41,7 +41,7 @@ struct Segment {
 };
 
 
-OBB CreateOBB(vec3 position, vec3 rotation, vec3 scale);
+OBB CreateOBB(vec3 position, quat rotation, vec3 scale);
 vec3 ClosestPtPointOBB(vec3 p, OBB *b);
 f32 SqDistPointOBB(vec3 p, OBB *b);
 i32 TestPointOBB(OBB *obb, vec3 p);

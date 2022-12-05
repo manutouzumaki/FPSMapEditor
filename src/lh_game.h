@@ -57,7 +57,12 @@ struct GameState {
     StaticEntity *currentEntity;
     Texture *currentTexture;
     Mesh *currentMesh;
-    vec3 clickMousePosition;
+    //vec3 clickMousePosition;
+    
+    vec3 startPosition;
+    vec3 offset;
+    bool setOffset;
+    bool moving;
 
     // TODO: test directx renderer
     //Mesh *cubeMesh;

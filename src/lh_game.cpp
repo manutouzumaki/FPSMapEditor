@@ -4,6 +4,7 @@
 #include "lh_input.h"
 #include "lh_static_entity.h"
 #include "lh_file.h"
+#include "lh_transform_entity.h"
 
 // TODO (Manuto):
 /////////////////////////////////////////////////////////////
@@ -308,7 +309,7 @@ StaticEntity *AddStaticEntityToArray(vec3 position, Mesh *mesh, GameState *gameS
     entity->mesh = mesh;
     entity->bitmap = gameState->bitmaps[0];
     entity->transform.position = position;
-    entity->transform.rotation = {0, 0, 0};
+    entity->transform.rotation = quat();
     entity->transform.scale = {1, 1, 1};
     entity->obb = CreateOBB(entity->transform.position,
                             entity->transform.rotation,
@@ -457,7 +458,8 @@ enum EditorState {
 enum AxisState {
     AXIS_X,
     AXIS_Y,
-    AXIS_Z
+    AXIS_Z,
+    AXIS_NONE
 };
 
 void AddEntityCallback(void *dataA, void *dataB) {
@@ -478,12 +480,15 @@ void EntityChangeMesh(void *dataA, void *dataB) {
     gameState->currentMesh = mesh;
 }
 
-global_variable EditorState editorState;
-global_variable AxisState axisState;
+global_variable EditorState editorState = NONE_STATE;
+global_variable AxisState axisState = AXIS_NONE;
 
 internal
 void UpdateEntities(GameState *gameState) {
-    if(MouseGetButtonJustDown(MOUSE_BUTTON_LEFT)) {
+    if(MouseGetButtonJustDown(MOUSE_BUTTON_LEFT) &&
+       !TranslateGetState() &&
+       !RotateGetState() &&
+       !ScaleGetState()) {
         f32 tMin = FLT_MAX;
         for(i32 i = 0; i < gameState->entitiesCount; ++i) { 
             StaticEntity *entity = gameState->entities + i;
@@ -497,7 +502,6 @@ void UpdateEntities(GameState *gameState) {
                     plane.n = gameState->camera.front * -1.0f;
                     if(RaycastPlane(&plane, &ray, &t)) {
                         gameState->currentEntity = entity;
-                        gameState->clickMousePosition = ray.o + ray.d * t;
                     }
                 }
             }
@@ -513,12 +517,44 @@ void UpdateEntities(GameState *gameState) {
             }
         }
     }
-    if(MouseGetButtonJustUp(MOUSE_BUTTON_LEFT)) {
-        gameState->currentEntity = NULL;
-        gameState->clickMousePosition = {0, 0, 0};
-    }
-    
+
     if(gameState->currentEntity) {
+        StaticEntity *entity = gameState->currentEntity;
+        if(editorState == TRANSLATE_STATE) {
+            TranslateEntity(gameState->currentEntity, &gameState->camera);
+            if(MouseGetButtonJustDown(MOUSE_BUTTON_LEFT)) {
+                TranslateAccept(gameState->currentEntity);
+            }
+            if(MouseGetButtonJustDown(MOUSE_BUTTON_RIGHT)) {
+                TranslateReject(gameState->currentEntity);    
+            }
+        }
+        if(editorState == ROTATE_STATE) {
+            RotateEntity(gameState->currentEntity, &gameState->camera);
+            if(MouseGetButtonJustDown(MOUSE_BUTTON_LEFT)) {
+                RotateAccept(gameState->currentEntity);
+            }
+            if(MouseGetButtonJustDown(MOUSE_BUTTON_RIGHT)) {
+                RotateReject(gameState->currentEntity);    
+            }
+        }
+        if(editorState == SCALE_STATE) {
+            ScaleEntity(gameState->currentEntity, &gameState->camera);
+            if(MouseGetButtonJustDown(MOUSE_BUTTON_LEFT)) {
+                ScaleAccept(gameState->currentEntity);
+            }
+            if(MouseGetButtonJustDown(MOUSE_BUTTON_RIGHT)) {
+                ScaleReject(gameState->currentEntity);    
+            }
+        }
+        if(editorState == NONE_STATE) {
+            TranslateReject(gameState->currentEntity);
+            RotateReject(gameState->currentEntity);
+            ScaleReject(gameState->currentEntity);
+
+        }
+
+#if 0
         if(MouseGetButtonDown(MOUSE_BUTTON_LEFT) &&
           !MouseGetButtonDown(MOUSE_BUTTON_RIGHT)) {
             StaticEntity *entity = gameState->currentEntity;
@@ -533,8 +569,12 @@ void UpdateEntities(GameState *gameState) {
                     vec3 hitPositiom = ray.o + ray.d * t;
                     vec3 offset = hitPositiom - gameState->clickMousePosition;
                     gameState->clickMousePosition = hitPositiom;
-                    entity->transform.position = entity->transform.position + offset;
-                    //entity->transform.position.v[axisState] += offset.v[axisState];
+                    if(axisState == AXIS_NONE) {
+                        entity->transform.position = entity->transform.position + offset;
+                    }
+                    else {
+                        entity->transform.position.v[axisState] += offset.v[axisState];
+                    }
                     entity->obb = CreateOBB(entity->transform.position,
                                             entity->transform.rotation,
                                             entity->transform.scale);
@@ -588,6 +628,7 @@ void UpdateEntities(GameState *gameState) {
                 }
             }
         }
+#endif
     }
 }
 
@@ -706,16 +747,20 @@ void GameUpdate(Memory *memory, f32 dt) {
     
     // this is for the editor mouse controls
     if(KeyboardGetKeyJustDown(KEYBOARD_KEY_T)) {
+        TranslateInitialize();
         editorState = TRANSLATE_STATE;
     }
     if(KeyboardGetKeyJustDown(KEYBOARD_KEY_R)) {
+        RotateInitialize();
         editorState = ROTATE_STATE;
     }
     if(KeyboardGetKeyJustDown(KEYBOARD_KEY_S)) {
+        ScaleInitialize();
         editorState = SCALE_STATE;
     }
-    if(KeyboardGetKeyJustDown(KEYBOARD_KEY_ESCAPE)) {
+    if(KeyboardGetKeyJustDown(KEYBOARD_KEY_ESCAPE)) { 
         editorState = NONE_STATE;
+        axisState = AXIS_NONE;
     }
 
     if(KeyboardGetKeyJustDown(KEYBOARD_KEY_X)) {
@@ -732,12 +777,12 @@ void GameUpdate(Memory *memory, f32 dt) {
     bool flag = true;
     for(i32 i = 0; i < gameState->buttonCount; ++i) {
         Button *button =  gameState->buttons + i;
-        f32 ratioX = (f32)WINDOW_WIDTH / WindowGetWidth();
-        f32 ratioY = (f32)WINDOW_HEIGHT / WindowGetHeight();
-        i32 minX = button->x / ratioX;
-        i32 maxX = (button->x + button->w) / ratioX;  
-        i32 minY = button->y / ratioY;
-        i32 maxY = (button->y + button->h) / ratioY;  
+        f32 ratioX = WindowGetWidth() / (f32)WINDOW_WIDTH;
+        f32 ratioY = WindowGetHeight() / (f32)WINDOW_HEIGHT;
+        i32 minX = button->x * ratioX;
+        i32 maxX = (button->x + button->w) * ratioX;  
+        i32 minY = button->y * ratioY;
+        i32 maxY = (button->y + button->h) * ratioY;  
         i32 mouseX = MouseGetCursorX();
         i32 mouseY = WindowGetHeight() - MouseGetCursorY();
         if(mouseX >= minX && mouseX <= maxX &&
@@ -755,7 +800,6 @@ void GameUpdate(Memory *memory, f32 dt) {
             }
         }
     }
-
 
     UpdateCamera(&gameState->camera);
 

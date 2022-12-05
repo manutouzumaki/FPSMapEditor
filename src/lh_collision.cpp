@@ -1,6 +1,6 @@
 #include "lh_collision.h"
 
-OBB CreateOBB(vec3 position, vec3 rotation, vec3 scale) {
+OBB CreateOBB(vec3 position, quat rotation, vec3 scale) {
     // Init OBB
     OBB result = {};
     vec3 cubeOBBRight = {1, 0, 0};
@@ -8,20 +8,14 @@ OBB CreateOBB(vec3 position, vec3 rotation, vec3 scale) {
     vec3 cubeOBBFront = {0, 0, 1};
     result.c = position;
     result.e = scale;
-    cubeOBBRight = Mat3RotateX(RAD(rotation.x)) * cubeOBBRight;
-    cubeOBBUp    = Mat3RotateX(RAD(rotation.x)) * cubeOBBUp;
-    cubeOBBFront = Mat3RotateX(RAD(rotation.x)) * cubeOBBFront;
-    cubeOBBRight = Mat3RotateY(RAD(rotation.y)) * cubeOBBRight;
-    cubeOBBUp    = Mat3RotateY(RAD(rotation.y)) * cubeOBBUp;
-    cubeOBBFront = Mat3RotateY(RAD(rotation.y)) * cubeOBBFront;
-    cubeOBBRight = Mat3RotateZ(RAD(rotation.z)) * cubeOBBRight;
-    cubeOBBUp    = Mat3RotateZ(RAD(rotation.z)) * cubeOBBUp;
-    cubeOBBFront = Mat3RotateZ(RAD(rotation.z)) * cubeOBBFront;
+    cubeOBBRight = rotation * cubeOBBRight;
+    cubeOBBUp    = rotation * cubeOBBUp;
+    cubeOBBFront = rotation * cubeOBBFront;
     result.u[0] = normalized(cubeOBBRight);
     result.u[1] = normalized(cubeOBBUp);
     result.u[2] = normalized(cubeOBBFront);
     mat4 translationMat = Mat4Translate(position.x, position.y, position.z);
-    mat4 rotationMat = Mat4RotateX(RAD(rotation.x)) * Mat4RotateY(RAD(rotation.y)) * Mat4RotateZ(RAD(rotation.z));
+    mat4 rotationMat = quatToMat4(rotation);
     mat4 scaleMat =  Mat4Scale(scale.x, scale.y, scale.z);
     result.world = translationMat * rotationMat  *scaleMat;
     result.color = 0xFF00FF00;

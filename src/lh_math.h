@@ -7,6 +7,7 @@
 #include <float.h>
 
 #define EPSILON 0.000001f
+#define QUAT_EPSILON 0.000001f
 #define PI 3.14159265359f
 #define RAD(value) (value*(PI/180.0f))
 #define DEG(value) (value*(180.0f/PI))
@@ -30,8 +31,12 @@ struct vec3 {
             f32 z;
         };
         f32 v[3];
-    }; 
+    };
 };
+
+inline vec3 Vec3(f32 x, f32 y, f32 z) {
+    return {x, y, z};
+}
 
 typedef vec3 Point;
 
@@ -48,7 +53,6 @@ struct vec4 {
     }; 
 };
 
-typedef vec4 quat;
 
 struct mat2 {
     union {
@@ -74,6 +78,12 @@ struct mat3 {
 struct mat4 {
     union {
         struct {
+            vec4 right;
+            vec4 up;
+            vec4 forward;
+            vec4 position;
+        };
+        struct {
             f32 m00; f32 m01; f32 m02; f32 m03;
             f32 m10; f32 m11; f32 m12; f32 m13;
             f32 m20; f32 m21; f32 m22; f32 m23;
@@ -92,6 +102,25 @@ struct mat4 {
     };
 };
 
+struct quat {
+    union {
+        struct {
+            float x;
+            float y;
+            float z;
+            float w;
+        };
+        struct {
+            vec3 vector;
+            float scalar;
+        };
+        float v[4];
+    };
+
+    inline quat() : x(0.0f), y(0.0f), z(0.0f), w(1.0f) { }
+    inline quat(float _x, float _y, float _z, float _w) : x(_x), y(_y), z(_z), w(_w) { }
+};
+
 struct rectangle2i {
     i32 minX, minY;
     i32 maxX, maxY;
@@ -99,7 +128,7 @@ struct rectangle2i {
 
 struct Transform {
     vec3 position;
-    vec3 rotation;
+    quat rotation;
     vec3 scale; 
 };
 
@@ -109,7 +138,7 @@ rectangle2i RectangleUnion(rectangle2i a, rectangle2i b);
 i32 RectangleGetClampArea(rectangle2i a);
 bool RectangleHasArea(rectangle2i a);
 
-mat4 TransformToMat4(vec3 position, vec3 rotation, vec3 scale);
+mat4 TransformToMat4(vec3 position, quat rotation, vec3 scale);
 
 f32 lerp(f32 a, f32 b, f32 t);
 
@@ -172,6 +201,7 @@ mat3 Mat3Scale(f32 x, f32 y, f32 z);
 mat3 Mat3RotateX(f32 angle);
 mat3 Mat3RotateY(f32 angle);
 mat3 Mat3RotateZ(f32 angle);
+mat3 Mat3Rotate(vec3 axis, f32 angle);
 mat3 operator+(mat3 a, mat3 b);
 mat3 operator*(mat3 m, f32 f);
 vec3 operator*(mat3 m, vec3 v);
@@ -202,5 +232,34 @@ mat4 inverse(mat4 m);
 
 vec3 Vec4ToVec3(vec4 v);
 vec4 Vec3ToVec4(vec3 v, f32 w);
+
+quat angleAxis(float angle, const vec3 &axis);
+quat fromTo(const vec3 &from, const vec3 &to);
+vec3 getAxis(const quat &q);
+float getAngle(const quat &q);
+quat operator+(const quat &a, const quat &b);
+quat operator-(const quat &a, const quat &b);
+quat operator*(const quat &a, float b);
+quat operator-(const quat &q);
+bool operator==(const quat &left, const quat &right);
+bool operator!=(const quat &left, const quat &right);
+bool sameOrientation(const quat& left, const quat& right);
+float dot(const quat &a, const quat &b);
+float lenSq(const quat &q);
+float len(const quat &q);
+void normalize(quat &q);
+quat normalized(const quat &q);
+quat conjugate(const quat &q);
+quat inverse(const quat &q);
+quat operator*(const quat& q1, const quat& q2);
+vec3 operator*(const quat &q, const vec3 &v);
+quat mix(const quat &from, const quat &to, float t);
+quat nlerp(const quat &from, const quat &to, float t);
+quat operator^(const quat &q, float f);
+quat slerp(const quat &start, const quat &end, float t);
+quat lookRotation(const vec3 &direction, const vec3 &up);
+mat4 quatToMat4(const quat &q);
+quat mat4ToQuat(const mat4 &m);
+
 
 #endif
