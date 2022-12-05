@@ -524,111 +524,54 @@ void UpdateEntities(GameState *gameState) {
             TranslateEntity(gameState->currentEntity, &gameState->camera);
             if(MouseGetButtonJustDown(MOUSE_BUTTON_LEFT)) {
                 TranslateAccept(gameState->currentEntity);
+                editorState = NONE_STATE;
+                axisState = AXIS_NONE;
             }
-            if(MouseGetButtonJustDown(MOUSE_BUTTON_RIGHT)) {
+            if(MouseGetButtonJustDown(MOUSE_BUTTON_RIGHT) ||
+               KeyboardGetKeyDown(KEYBOARD_KEY_ESCAPE)) {
                 TranslateReject(gameState->currentEntity);    
+                editorState = NONE_STATE;
+                axisState = AXIS_NONE;
             }
         }
         if(editorState == ROTATE_STATE) {
-            RotateEntity(gameState->currentEntity, &gameState->camera);
+            if(axisState == AXIS_NONE) {
+                RotateEntity(gameState->currentEntity, &gameState->camera);
+            }
+            else {
+                RotateEntityAxis(gameState->currentEntity, &gameState->camera, axisState);
+            }
             if(MouseGetButtonJustDown(MOUSE_BUTTON_LEFT)) {
                 RotateAccept(gameState->currentEntity);
+                editorState = NONE_STATE;
+                axisState = AXIS_NONE;
             }
-            if(MouseGetButtonJustDown(MOUSE_BUTTON_RIGHT)) {
+            if(MouseGetButtonJustDown(MOUSE_BUTTON_RIGHT) ||
+               KeyboardGetKeyDown(KEYBOARD_KEY_ESCAPE)) {
                 RotateReject(gameState->currentEntity);    
+                editorState = NONE_STATE;
+                axisState = AXIS_NONE;
             }
         }
         if(editorState == SCALE_STATE) {
-            ScaleEntity(gameState->currentEntity, &gameState->camera);
+            if(axisState == AXIS_NONE) {
+                ScaleEntity(gameState->currentEntity, &gameState->camera);
+            }
+            else {
+                ScaleEntityAxis(gameState->currentEntity, &gameState->camera, axisState);
+            }
             if(MouseGetButtonJustDown(MOUSE_BUTTON_LEFT)) {
                 ScaleAccept(gameState->currentEntity);
+                editorState = NONE_STATE;
+                axisState = AXIS_NONE;
             }
-            if(MouseGetButtonJustDown(MOUSE_BUTTON_RIGHT)) {
+            if(MouseGetButtonJustDown(MOUSE_BUTTON_RIGHT) ||
+               KeyboardGetKeyJustDown(KEYBOARD_KEY_ESCAPE)) {
                 ScaleReject(gameState->currentEntity);    
+                editorState = NONE_STATE;
+                axisState = AXIS_NONE;
             }
         }
-        if(editorState == NONE_STATE) {
-            TranslateReject(gameState->currentEntity);
-            RotateReject(gameState->currentEntity);
-            ScaleReject(gameState->currentEntity);
-
-        }
-
-#if 0
-        if(MouseGetButtonDown(MOUSE_BUTTON_LEFT) &&
-          !MouseGetButtonDown(MOUSE_BUTTON_RIGHT)) {
-            StaticEntity *entity = gameState->currentEntity;
-            // TODO: IMPORTANT improve this
-            if(editorState == TRANSLATE_STATE) {
-                Plane plane;
-                plane.p = gameState->camera.position - entity->transform.position;
-                plane.n = gameState->camera.front * -1.0f;
-                Ray ray = GetMouseRay(gameState, MouseGetCursorX(), MouseGetCursorY());
-                f32 t = 0.0f;
-                if(RaycastPlane(&plane, &ray, &t)) {
-                    vec3 hitPositiom = ray.o + ray.d * t;
-                    vec3 offset = hitPositiom - gameState->clickMousePosition;
-                    gameState->clickMousePosition = hitPositiom;
-                    if(axisState == AXIS_NONE) {
-                        entity->transform.position = entity->transform.position + offset;
-                    }
-                    else {
-                        entity->transform.position.v[axisState] += offset.v[axisState];
-                    }
-                    entity->obb = CreateOBB(entity->transform.position,
-                                            entity->transform.rotation,
-                                            entity->transform.scale);
-                    entity->world = TransformToMat4(entity->transform.position,
-                                                    entity->transform.rotation,
-                                                    entity->transform.scale);
-                }
-            }
-            else if(editorState == ROTATE_STATE) { 
-                Plane plane;
-                plane.p = gameState->camera.position - entity->transform.position;
-                plane.n = gameState->camera.front * -1.0f;
-                Ray ray = GetMouseRay(gameState, MouseGetCursorX(), MouseGetCursorY());
-                f32 t = 0.0f;
-                if(RaycastPlane(&plane, &ray, &t)) {
-                    vec3 hitPositiom = ray.o + ray.d * t;
-                    vec3 offset = hitPositiom - gameState->clickMousePosition;
-                    gameState->clickMousePosition = hitPositiom;
-
-                    entity->transform.rotation.v[axisState] += offset.v[axisState] * 10.0f;
-                    
-                    entity->obb = CreateOBB(entity->transform.position,
-                                            entity->transform.rotation,
-                                            entity->transform.scale);
-                    entity->world = TransformToMat4(entity->transform.position,
-                                                    entity->transform.rotation,
-                                                    entity->transform.scale);
-                }
-
-            }
-            else if(editorState == SCALE_STATE) {
-                Plane plane;
-                plane.p = gameState->camera.position - entity->transform.position;
-                plane.n = gameState->camera.front * -1.0f;
-                Ray ray = GetMouseRay(gameState, MouseGetCursorX(), MouseGetCursorY());
-                f32 t = 0.0f;
-                if(RaycastPlane(&plane, &ray, &t)) {
-                    vec3 hitPositiom = ray.o + ray.d * t;
-                    vec3 offset = hitPositiom - gameState->clickMousePosition;
-                    gameState->clickMousePosition = hitPositiom;
-
-        
-                    entity->transform.scale.v[axisState] += offset.v[axisState];
-                    
-                    entity->obb = CreateOBB(entity->transform.position,
-                                            entity->transform.rotation,
-                                            entity->transform.scale);
-                    entity->world = TransformToMat4(entity->transform.position,
-                                                    entity->transform.rotation,
-                                                    entity->transform.scale);
-                }
-            }
-        }
-#endif
     }
 }
 
@@ -746,31 +689,28 @@ void GameUpdate(Memory *memory, f32 dt) {
     }
     
     // this is for the editor mouse controls
-    if(KeyboardGetKeyJustDown(KEYBOARD_KEY_T)) {
-        TranslateInitialize();
-        editorState = TRANSLATE_STATE;
-    }
-    if(KeyboardGetKeyJustDown(KEYBOARD_KEY_R)) {
-        RotateInitialize();
-        editorState = ROTATE_STATE;
-    }
-    if(KeyboardGetKeyJustDown(KEYBOARD_KEY_S)) {
-        ScaleInitialize();
-        editorState = SCALE_STATE;
-    }
-    if(KeyboardGetKeyJustDown(KEYBOARD_KEY_ESCAPE)) { 
-        editorState = NONE_STATE;
-        axisState = AXIS_NONE;
-    }
-
-    if(KeyboardGetKeyJustDown(KEYBOARD_KEY_X)) {
-        axisState = AXIS_X; 
-    }
-    if(KeyboardGetKeyJustDown(KEYBOARD_KEY_Y)) {
-        axisState = AXIS_Y; 
-    }
-    if(KeyboardGetKeyJustDown(KEYBOARD_KEY_Z)) {
-        axisState = AXIS_Z; 
+    if(gameState->currentEntity) {
+        if(KeyboardGetKeyJustDown(KEYBOARD_KEY_T)) {
+            TranslateInitialize();
+            editorState = TRANSLATE_STATE;
+        }
+        if(KeyboardGetKeyJustDown(KEYBOARD_KEY_R)) {
+            RotateInitialize();
+            editorState = ROTATE_STATE;
+        }
+        if(KeyboardGetKeyJustDown(KEYBOARD_KEY_S)) {
+            ScaleInitialize();
+            editorState = SCALE_STATE;
+        }
+        if(KeyboardGetKeyJustDown(KEYBOARD_KEY_X)) {
+            axisState = AXIS_X; 
+        }
+        if(KeyboardGetKeyJustDown(KEYBOARD_KEY_Y)) {
+            axisState = AXIS_Y; 
+        }
+        if(KeyboardGetKeyJustDown(KEYBOARD_KEY_Z)) {
+            axisState = AXIS_Z; 
+        }
     }
 
     // update buttons

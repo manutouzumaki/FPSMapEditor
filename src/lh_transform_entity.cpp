@@ -50,8 +50,19 @@ Ray GetMouseRay(Camera *camera, f32 x, f32 y) {
     return ray;
 }
 
+internal
+void UpdateEntity(StaticEntity *entity) {
+    entity->obb = CreateOBB(entity->transform.position,
+                            entity->transform.rotation,
+                            entity->transform.scale);
+    entity->world = TransformToMat4(entity->transform.position,
+                                    entity->transform.rotation,
+                                    entity->transform.scale);
+}
+
 global_variable TranslateState gTranslateState = {};
 global_variable RotateState gRotateState = {};
+global_variable ScaleState gScaleState = {};
 
 void TranslateInitialize() {
     gTranslateState.moving = true;
@@ -78,12 +89,7 @@ void TranslateEntity(StaticEntity *entity, Camera *camera) {
             entity->transform.position.x = roundf(entity->transform.position.x);
             entity->transform.position.y = roundf(entity->transform.position.y);
             entity->transform.position.z = roundf(entity->transform.position.z);
-            entity->obb = CreateOBB(entity->transform.position,
-                                    entity->transform.rotation,
-                                    entity->transform.scale);
-            entity->world = TransformToMat4(entity->transform.position,
-                                            entity->transform.rotation,
-                                            entity->transform.scale);
+            UpdateEntity(entity);
         }
     }
 }
@@ -98,13 +104,7 @@ void TranslateAccept(StaticEntity *entity) {
 void TranslateReject(StaticEntity *entity) {
     if(gTranslateState.moving) {
         entity->transform.position = gTranslateState.startPosition;
-        entity->obb = CreateOBB(entity->transform.position,
-                                entity->transform.rotation,
-                                entity->transform.scale);
-        entity->world = TransformToMat4(entity->transform.position,
-                                        entity->transform.rotation,
-                                        entity->transform.scale);
-
+        UpdateEntity(entity);
         gTranslateState.moving = false;
         gTranslateState.setOffset = false;
     } 
@@ -119,10 +119,28 @@ void RotateInitialize() {
     gRotateState.setMouseToObject = true;
 }
 
-#include "windows.h"
-#include "stdio.h"
-
 void RotateEntity(StaticEntity *entity, Camera *camera) {
+    if(gRotateState.moving) {
+        Plane plane;
+        plane.p = camera->position - entity->transform.position;
+        plane.n = camera->front * -1.0f;
+        Ray ray = GetMouseRay(camera, MouseGetCursorX(), MouseGetCursorY());
+        f32 t = 0.0f;
+        if(RaycastPlane(&plane, &ray, &t)) {
+            vec3 hitPosition = ray.o + ray.d * t;
+            if(gRotateState.setMouseToObject) {
+                gRotateState.startRotation = entity->transform.rotation;
+                gRotateState.mouseToObject = normalized(hitPosition - entity->transform.position);
+                gRotateState.setMouseToObject = false;
+            }
+            vec3 currentMouseToObject = normalized(hitPosition - entity->transform.position);
+            entity->transform.rotation = gRotateState.startRotation * fromTo(gRotateState.mouseToObject, currentMouseToObject); 
+            UpdateEntity(entity);
+        }
+    }
+}
+
+void RotateEntityAxis(StaticEntity *entity, Camera *camera, i32 axis) {
     if(gRotateState.moving) {
         Plane plane;
         plane.p = camera->position - entity->transform.position;
@@ -137,23 +155,22 @@ void RotateEntity(StaticEntity *entity, Camera *camera) {
                 gRotateState.mouseToObject = normalized(hitPosition - entity->transform.position);
                 gRotateState.setMouseToObject = false;
             }
-
             vec3 currentMouseToObject = normalized(hitPosition - entity->transform.position);
-            //entity->transform.rotation = fromTo(gRotateState.mouseToObject, currentMouseToObject);
-            
             f32 angleSide = dot(normalized(cross(plane.n, gRotateState.mouseToObject)), currentMouseToObject);
             f32 angleBet = angle(gRotateState.mouseToObject, currentMouseToObject);
             if(angleSide < 0.0f) {
                 angleBet = RAD(360.0f) - angleBet;
             }
-            quat target = gRotateState.startRotation * angleAxis(angleBet, plane.n);
-            entity->transform.rotation = target;
-            entity->obb = CreateOBB(entity->transform.position,
-                                    entity->transform.rotation,
-                                    entity->transform.scale);
-            entity->world = TransformToMat4(entity->transform.position,
-                                            entity->transform.rotation,
-                                            entity->transform.scale);
+            vec3 axisArray[3] = {
+                {1, 0, 0},
+                {0, 1, 0},
+                {0, 0, 1}
+            };
+            if(dot(normalized(plane.p), axisArray[axis]) < 0.0f) {
+                angleBet = -angleBet;
+            }
+            entity->transform.rotation = gRotateState.startRotation * angleAxis(angleBet, axisArray[axis]);
+            UpdateEntity(entity);
         }
     }
 }
@@ -168,38 +185,87 @@ void RotateAccept(StaticEntity *entity) {
 void RotateReject(StaticEntity *entity) {
     if(gRotateState.moving) {
         entity->transform.rotation = gRotateState.startRotation;
-        entity->obb = CreateOBB(entity->transform.position,
-                                entity->transform.rotation,
-                                entity->transform.scale);
-        entity->world = TransformToMat4(entity->transform.position,
-                                        entity->transform.rotation,
-                                        entity->transform.scale);
-
+        UpdateEntity(entity);
         gRotateState.moving = false;
         gRotateState.setMouseToObject = false;
     }
 }
 
 bool RotateGetState() {
-    return false;
+    return gRotateState.moving;
 }
 
 void ScaleInitialize() {
-
+    gScaleState.moving = true;
+    gScaleState.set = true;
 }
 
 void ScaleEntity(StaticEntity *entity, Camera *camera) {
+    if(gScaleState.moving) {
+        Plane plane;
+        plane.p = camera->position - entity->transform.position;
+        plane.n = camera->front * -1.0f;
+        Ray ray = GetMouseRay(camera, MouseGetCursorX(), MouseGetCursorY());
+        f32 t = 0.0f;
+        if(RaycastPlane(&plane, &ray, &t)) {
+            vec3 hitPosition = ray.o + ray.d * t;
+            if(gScaleState.set) {
+                gScaleState.startScale = entity->transform.scale;
+                gScaleState.scaleVector = hitPosition - entity->transform.position;
+                gScaleState.set = false;
+            }
+            vec3 currentMouseToObject = hitPosition - entity->transform.position;
+            f32 ratio = lenSq(currentMouseToObject) / lenSq(gScaleState.scaleVector);
+            entity->transform.scale = gScaleState.startScale * ratio; 
+            UpdateEntity(entity);
+        }
+    }
+}
 
+void ScaleEntityAxis(StaticEntity *entity, Camera *camera, i32 axis) {
+    if(gScaleState.moving) {
+        Plane plane;
+        plane.p = camera->position - entity->transform.position;
+        plane.n = camera->front * -1.0f;
+        Ray ray = GetMouseRay(camera, MouseGetCursorX(), MouseGetCursorY());
+        f32 t = 0.0f;
+        if(RaycastPlane(&plane, &ray, &t)) {
+            vec3 hitPosition = ray.o + ray.d * t;
+            if(gScaleState.set) {
+                gScaleState.startScale = entity->transform.scale;
+                gScaleState.scaleVector = hitPosition - entity->transform.position;
+                gScaleState.set = false;
+            }
+            vec3 currentMouseToObject = hitPosition - entity->transform.position;
+            f32 ratio = lenSq(currentMouseToObject) / lenSq(gScaleState.scaleVector);
+            vec3 axisArray[3] = {
+                {1, 0, 0},
+                {0, 1, 0},
+                {0, 0, 1}
+            };
+            entity->transform.scale = gScaleState.startScale;
+            entity->transform.scale.v[axis] = gScaleState.startScale.v[axis] * ratio; 
+            UpdateEntity(entity);
+        }
+    }
 }
 
 void ScaleAccept(StaticEntity *entity) {
-
+    if(gScaleState.moving) {
+        gScaleState.moving = false;
+        gScaleState.set = false;
+    } 
 }
 
 void ScaleReject(StaticEntity *entity) {
-
+    if(gScaleState.moving) {
+        entity->transform.scale = gScaleState.startScale;
+        UpdateEntity(entity);
+        gScaleState.moving = false;
+        gScaleState.set = false;
+    }
 }
 
 bool ScaleGetState() {
-    return false;
+    return gScaleState.moving;
 }

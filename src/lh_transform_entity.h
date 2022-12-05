@@ -21,6 +21,13 @@ struct RotateState {
     bool moving;
 };
 
+struct ScaleState {
+    vec3 startScale;
+    vec3 scaleVector;
+    bool set;
+    bool moving;
+};
+
 void TranslateInitialize();
 void TranslateEntity(StaticEntity *entity, Camera *camera);
 void TranslateAccept(StaticEntity *entity);
@@ -29,12 +36,14 @@ bool TranslateGetState();
 
 void RotateInitialize();
 void RotateEntity(StaticEntity *entity, Camera *camera);
+void RotateEntityAxis(StaticEntity *entity, Camera *camera, i32 axis);
 void RotateAccept(StaticEntity *entity);
 void RotateReject(StaticEntity *entity);
 bool RotateGetState();
 
 void ScaleInitialize();
 void ScaleEntity(StaticEntity *entity, Camera *camera);
+void ScaleEntityAxis(StaticEntity *entity, Camera *camera, i32 axis);
 void ScaleAccept(StaticEntity *entity);
 void ScaleReject(StaticEntity *entity);
 bool ScaleGetState();
