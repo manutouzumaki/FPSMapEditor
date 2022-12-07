@@ -30,6 +30,7 @@ struct ScaleState {
 
 void TranslateInitialize();
 void TranslateEntity(StaticEntity *entity, Camera *camera);
+void TranslateEntityAxis(StaticEntity *entity, Camera *camera, i32 axis);
 void TranslateAccept(StaticEntity *entity);
 void TranslateReject(StaticEntity *entity);
 bool TranslateGetState();

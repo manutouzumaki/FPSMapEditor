@@ -512,6 +512,16 @@ void UpdateEntities(GameState *gameState) {
                 gameState->currentTexture = NULL;
             }
             if(gameState->currentMesh) {
+                bool flag = false;
+                for(i32 i = 0; i < gameState->meshesCount; ++i) {
+                    if(gameState->currentMesh == gameState->meshes[i] && i == 3) {
+                        flag = true;
+                    }
+                }
+                if(flag) {
+                    gameState->currentEntity->transform.scale.z = 0.01f;
+                    gameState->currentEntity->obb.e.z = 0.01f;
+                }
                 gameState->currentEntity->mesh = gameState->currentMesh;
                 gameState->currentMesh = NULL;
             }
@@ -521,7 +531,12 @@ void UpdateEntities(GameState *gameState) {
     if(gameState->currentEntity) {
         StaticEntity *entity = gameState->currentEntity;
         if(editorState == TRANSLATE_STATE) {
-            TranslateEntity(gameState->currentEntity, &gameState->camera);
+            if(axisState == AXIS_NONE) {
+                TranslateEntity(gameState->currentEntity, &gameState->camera);
+            }
+            else {
+                TranslateEntityAxis(gameState->currentEntity, &gameState->camera, axisState);
+            }
             if(MouseGetButtonJustDown(MOUSE_BUTTON_LEFT)) {
                 TranslateAccept(gameState->currentEntity);
                 editorState = NONE_STATE;

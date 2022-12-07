@@ -85,10 +85,39 @@ void TranslateEntity(StaticEntity *entity, Camera *camera) {
                 gTranslateState.setOffset = false;
             }
 
-            entity->transform.position = hitPosition - gTranslateState.offset;
+            vec3 oldP = gTranslateState.startPosition;
+            vec3 newP = hitPosition - gTranslateState.offset;
+            entity->transform.position = gTranslateState.startPosition + (newP - oldP);
             entity->transform.position.x = roundf(entity->transform.position.x);
             entity->transform.position.y = roundf(entity->transform.position.y);
             entity->transform.position.z = roundf(entity->transform.position.z);
+            UpdateEntity(entity);
+        }
+    }
+}
+
+void TranslateEntityAxis(StaticEntity *entity, Camera *camera, i32 axis) {
+    if(gTranslateState.moving) {
+        Plane plane;
+        plane.p = camera->position - entity->transform.position;
+        plane.n = camera->front * -1.0f;
+        Ray ray = GetMouseRay(camera, MouseGetCursorX(), MouseGetCursorY());
+        f32 t = 0.0f;
+        if(RaycastPlane(&plane, &ray, &t)) {
+            vec3 hitPosition = ray.o + ray.d * t;
+            
+            if(gTranslateState.setOffset) {
+                gTranslateState.startPosition = entity->transform.position;
+                gTranslateState.offset = hitPosition - entity->transform.position;
+                gTranslateState.setOffset = false;
+            }
+           
+            vec3 oldP = gTranslateState.startPosition;
+            vec3 newP = hitPosition;
+            vec3 finalP = gTranslateState.startPosition + (newP - oldP);
+            entity->transform.position = oldP;
+            entity->transform.position.v[axis] = finalP.v[axis];
+            entity->transform.position.v[axis] = roundf(entity->transform.position.v[axis]);
             UpdateEntity(entity);
         }
     }
@@ -215,9 +244,11 @@ void ScaleEntity(StaticEntity *entity, Camera *camera) {
                 gScaleState.set = false;
             }
             vec3 currentMouseToObject = hitPosition - entity->transform.position;
-            f32 ratio = lenSq(currentMouseToObject) / lenSq(gScaleState.scaleVector);
-            entity->transform.scale = gScaleState.startScale * ratio; 
-            UpdateEntity(entity);
+            f32 ratio = (lenSq(currentMouseToObject) / lenSq(gScaleState.scaleVector));            
+            if(ratio > 0.0f) {
+                entity->transform.scale = gScaleState.startScale  * ratio;
+                UpdateEntity(entity);
+            }
         }
     }
 }
@@ -238,13 +269,10 @@ void ScaleEntityAxis(StaticEntity *entity, Camera *camera, i32 axis) {
             }
             vec3 currentMouseToObject = hitPosition - entity->transform.position;
             f32 ratio = lenSq(currentMouseToObject) / lenSq(gScaleState.scaleVector);
-            vec3 axisArray[3] = {
-                {1, 0, 0},
-                {0, 1, 0},
-                {0, 0, 1}
-            };
-            entity->transform.scale = gScaleState.startScale;
-            entity->transform.scale.v[axis] = gScaleState.startScale.v[axis] * ratio; 
+            if(ratio > 0.0f) {
+                entity->transform.scale = gScaleState.startScale;
+                entity->transform.scale.v[axis] = gScaleState.startScale.v[axis] * ratio; 
+            }
             UpdateEntity(entity);
         }
     }

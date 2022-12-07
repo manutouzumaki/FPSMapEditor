@@ -142,6 +142,12 @@ mat4 TransformToMat4(vec3 position, quat rotation, vec3 scale);
 
 f32 lerp(f32 a, f32 b, f32 t);
 
+f32 Lerp(f32 a, f32 b, f32 t);
+f32 InvLerp(f32 a, f32 b, f32 v);
+f32 Remap(f32 iMin, f32 iMax, f32 oMin, f32 oMax, f32 v);
+
+
+
 vec2 operator+(vec2 l, vec2 r);
 vec2 operator-(vec2 l, vec2 r);
 vec2 operator*(vec2 l, vec2 r);

@@ -11,6 +11,17 @@ f32 lerp(f32 a, f32 b, f32 t) {
     return result;
 }
 
+f32 Lerp(f32 a, f32 b, f32 t) {
+    return (1.0f - t) * a + b * t;
+}
+f32 InvLerp(f32 a, f32 b, f32 v) {
+    return (v - a) / (b - a);
+}
+f32 Remap(f32 iMin, f32 iMax, f32 oMin, f32 oMax, f32 v) {
+    f32 t = InvLerp(iMin, iMax, v);
+    return Lerp(oMin, oMax, t);
+}
+
 
 // VEC2 FUNCTIONS
 vec2 operator+(vec2 l, vec2 r) {
