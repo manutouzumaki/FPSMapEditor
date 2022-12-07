@@ -317,6 +317,8 @@ StaticEntity *AddStaticEntityToArray(vec3 position, Mesh *mesh, GameState *gameS
     entity->world = TransformToMat4(entity->transform.position,
                                     entity->transform.rotation,
                                     entity->transform.scale);
+    entity->repeatU = 1.0f;
+    entity->repeatV = 1.0f;
     gameState->entities = entity;
     return entity;
 }
@@ -328,10 +330,8 @@ void DrawStaticEntityArray(StaticEntity *entities, i32 count,
     for(i32 i = 0; i < count; ++i) {
         StaticEntity *staticEntity = entities + i;
         Mesh *mesh = staticEntity->mesh;
-        f32 repeatV = 1.0f;//staticEntity->transform.scale.y;
-        f32 repeatU = 1.0f;//staticEntity->transform.scale.x > staticEntity->transform.scale.z ? staticEntity->transform.scale.x : staticEntity->transform.scale.z;
         RendererDrawMesh(mesh, staticEntity->world, staticEntity->bitmap, lightsToRendere, lightsToRenderCount,
-                         gameState->camera.position, true, repeatU, repeatV,
+                         gameState->camera.position, true, staticEntity->repeatU, staticEntity->repeatV,
                          &gameState->constBuffer, gameState->shader);
     }
 }
@@ -452,7 +452,8 @@ enum EditorState {
     NONE_STATE,
     TRANSLATE_STATE,
     ROTATE_STATE,
-    SCALE_STATE
+    SCALE_STATE,
+    UV_STATE
 };
 
 enum AxisState {
@@ -512,6 +513,8 @@ void UpdateEntities(GameState *gameState) {
                 gameState->currentTexture = NULL;
             }
             if(gameState->currentMesh) {
+                
+                //////////////////////////////////////////////////////////////////////
                 bool flag = false;
                 for(i32 i = 0; i < gameState->meshesCount; ++i) {
                     if(gameState->currentMesh == gameState->meshes[i] && i == 3) {
@@ -522,6 +525,12 @@ void UpdateEntities(GameState *gameState) {
                     gameState->currentEntity->transform.scale.z = 0.01f;
                     gameState->currentEntity->obb.e.z = 0.01f;
                 }
+                else {
+                    gameState->currentEntity->transform.scale.z = 1.0f;
+                    gameState->currentEntity->obb.e.z = 1.0f;                
+                }
+                //////////////////////////////////////////////////////////////////////
+
                 gameState->currentEntity->mesh = gameState->currentMesh;
                 gameState->currentMesh = NULL;
             }
@@ -585,6 +594,26 @@ void UpdateEntities(GameState *gameState) {
                 ScaleReject(gameState->currentEntity);    
                 editorState = NONE_STATE;
                 axisState = AXIS_NONE;
+            }
+        }
+        if(editorState == UV_STATE) {
+            if(KeyboardGetKeyJustDown(KEYBOARD_KEY_RIGHT)) {
+                gameState->currentEntity->repeatU += 1.0f;
+            }
+            if(KeyboardGetKeyJustDown(KEYBOARD_KEY_LEFT)) {
+                gameState->currentEntity->repeatU -= 1.0f;
+                if(gameState->currentEntity->repeatU < 1.0f) {
+                    gameState->currentEntity->repeatU = 1.0f;
+                }
+            }
+            if(KeyboardGetKeyJustDown(KEYBOARD_KEY_UP)) {
+                gameState->currentEntity->repeatV += 1.0f; 
+            }
+            if(KeyboardGetKeyJustDown(KEYBOARD_KEY_DOWN)) {
+                gameState->currentEntity->repeatV -= 1.0f;
+                if(gameState->currentEntity->repeatV < 1.0f) {
+                    gameState->currentEntity->repeatV = 1.0f;
+                }
             }
         }
     }
@@ -716,6 +745,9 @@ void GameUpdate(Memory *memory, f32 dt) {
         if(KeyboardGetKeyJustDown(KEYBOARD_KEY_S)) {
             ScaleInitialize();
             editorState = SCALE_STATE;
+        }
+        if(KeyboardGetKeyJustDown(KEYBOARD_KEY_U)) {
+            editorState = UV_STATE;
         }
         if(KeyboardGetKeyJustDown(KEYBOARD_KEY_X)) {
             axisState = AXIS_X; 

@@ -16,6 +16,8 @@ struct StaticEntity {
     Mesh *mesh;
     Texture *bitmap;
     OBB obb;
+    f32 repeatU;
+    f32 repeatV;
 };
 
 struct Light {
